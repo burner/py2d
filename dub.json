@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"Robert Schadek"
+	],
+	"copyright": "Copyright © 2021, Robert Schadek",
+	"dependencies": {
+		"argsd": "~>1.0.0"
+	},
+	"description": "A tool to convert python to dlang",
+	"license": "GPL3",
+	"name": "pytod"
+}

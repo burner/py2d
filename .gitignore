@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/pytod
+pytod.so
+pytod.dylib
+pytod.dll
+pytod.a
+pytod.lib
+pytod-test-*
+*.exe
+*.o
+*.obj
+*.lst
