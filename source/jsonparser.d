@@ -13,6 +13,9 @@ import std.stdio;
 import std.meta;
 import std.traits;
 import std.typecons;
+
+import aggregateprinter;
+
 import ast;
 
 string[] filterClassMembers(string[] mems) {
@@ -45,23 +48,26 @@ template allMembers(T) {
 }
 
 T fromJson(T, string mem)(const(JSONValue) jv) {
+	//writefln("%s %s", T.stringof, mem);
 	enforce(jv.type == JSONType.object
 		, format("Trying to parse an '%s', expected object got '%s'"
 			, T.stringof, jv.toPrettyString()));
+	const(JSONValue)* val = mem in jv;
 	static if(is(T : Nullable!F, F...)) {
-		return mem !in jv
+		return val is null || val.type == JSONType.null_
 			? T.init
 			: nullable(fromJson!(F[0], mem)(jv));
 	} else {
-		const(JSONValue)* val = mem in jv;
 		enforce(val !is null, format("Counldn't find '%s' of type '%s' in '%s'"
 				, mem, T.stringof, jv.toPrettyString()));
 
 		static if(is(T == enum)) {
-			return to!T((*val).get!long());
+			return parse!T(*val);
 		} else static if(isIntegral!T) {
 			return (*val).get!long();
 		} else static if(isSomeString!T) {
+			enforce(val.type == JSONType.string, format(
+					"Expected string got '%s'", val.toPrettyString()));
 			return (*val).get!string();
 		} else static if(is(T == bool)) {
 			return (*val).get!bool();
@@ -75,10 +81,13 @@ T fromJson(T, string mem)(const(JSONValue) jv) {
 				arr ~= parse!ET(it);
 			}
 			return arr;
-		} else static if(is(T == class)) {
-			return parse!T(*val);
+		} else static if(is(T == JSONValue)) {
+			return *val;
 		} else static if(is(T == Expr)) {
 			return parseExpr(*val);
+		} else static if(is(T == class)) {
+			writeln("Parse class");
+			return parse!T(*val);
 		} else {
 			static assert(false, T.stringof);
 		}
@@ -86,7 +95,16 @@ T fromJson(T, string mem)(const(JSONValue) jv) {
 }
 
 T parse(T)(const(JSONValue) jv) if(is(T == enum)) {
-	return T.init;
+	enforce(jv.type == JSONType.object
+		, format("Trying to parse an '%s', expected object got '%s'"
+			, T.stringof, jv.toPrettyString()));
+	const(JSONValue)* type = "_type" in jv;
+	enforce(type !is null, format("Parsing '%s' no element named '_type' in '%s'"
+		, T.stringof, jv.toPrettyString()));
+	enforce(type.type == JSONType.string, format("Expecting string got '%s'"
+		, type.toPrettyString()));
+
+	return to!T(type.get!string());
 }
 
 T parse(T)(const(JSONValue) jv) if(is(T == class)) {
@@ -114,13 +132,17 @@ Expr parseExpr(JSONValue jv) {
 			, jv.toPrettyString()));
 
 	const(JSONValue)* value = "value" in jv;
-	enforce(value !is null, "value not found");
-	enforce(value.type == JSONType.object, format("value not a object but '%s'"
-			, value.toPrettyString()));
+	//enforce(value !is null, "value not found");
+	//enforce(value.type == JSONType.object, format("value not a object but '%s'"
+	//		, value.toPrettyString()));
 
-	Expr ret = new Expr();
-	ret.value = parseExprValue(*value);
-	return ret;
+	if(value is null || value.type != JSONType.object) {
+		return parseExprValue(jv);
+	} else {
+		auto ret = new Expr();
+		ret.value = nullable(parseExprValue(*value));
+		return ret;
+	}
 }
 
 Expr parseExprValue(JSONValue jv) {
@@ -194,8 +216,113 @@ unittest {
 }
 
 unittest {
+	JSONValue jv = parseJSON(
+`
+        {
+            "_type": "Import",
+            "col_offset": 0,
+            "end_col_offset": 10,
+            "end_lineno": 1,
+            "lineno": 1,
+            "names": [
+                {
+                    "_type": "alias",
+                    "asname": null,
+                    "name": "ast"
+                }
+            ]
+        }`);
+	auto e = parse!Import(jv);
+}
+
+unittest {
 	import std.file : readText;
 	JSONValue jv = parseJSON(readText("out.json"));
 	Module e = parse!Module(jv);
 	assert(e !is null);
+}
+
+
+
+unittest {
+	JSONValue jv = parseJSON(`{
+    "_type": "ImportFrom",
+    "col_offset": 0,
+    "end_col_offset": 29,
+    "end_lineno": 3,
+    "level": 0,
+    "lineno": 3,
+    "module": "ast2json",
+    "names": [
+        {
+            "_type": "alias",
+            "asname": null,
+            "name": "ast2json"
+        }
+    ]
+}`);
+	auto e = parse!ImportFrom(jv);
+}
+
+unittest {
+	auto jv = parseJSON(`
+{
+    "_type": "BinOp",
+    "col_offset": 6,
+    "end_col_offset": 19,
+    "end_lineno": 1,
+    "left": {
+        "_type": "BinOp",
+        "col_offset": 6,
+        "end_col_offset": 13,
+        "end_lineno": 1,
+        "left": {
+            "_type": "Constant",
+            "col_offset": 6,
+            "end_col_offset": 8,
+            "end_lineno": 1,
+            "kind": null,
+            "lineno": 1,
+            "n": 10,
+            "s": 10,
+            "value": 10
+        },
+        "lineno": 1,
+        "op": {
+            "_type": "Mult"
+        },
+        "right": {
+            "_type": "Constant",
+            "col_offset": 11,
+            "end_col_offset": 13,
+            "end_lineno": 1,
+            "kind": null,
+            "lineno": 1,
+            "n": 20,
+            "s": 20,
+            "value": 20
+        }
+    },
+    "lineno": 1,
+    "op": {
+        "_type": "Add"
+    },
+    "right": {
+        "_type": "Constant",
+        "col_offset": 16,
+        "end_col_offset": 19,
+        "end_lineno": 1,
+        "kind": null,
+        "lineno": 1,
+        "n": 5.2,
+        "s": 5.2,
+        "value": 5.2
+    }
+}`);
+	auto e = parse!BinOp(jv);
+	assert(e.left !is null);
+	assert(e.right !is null);
+	auto r = cast(Constant)e.right;
+	assert(r !is null);
+	assert(r.value.type == JSONType.float_);
 }

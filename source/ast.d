@@ -1,5 +1,7 @@
 import std.typecons : Nullable;
 
+import std.json;
+
 alias Identifier = string;
 
 class Node {
@@ -506,7 +508,7 @@ class JoinedStr : Expr {
 
 	// | Constant(constant value, string? kind)
 class Constant : Expr {
-	Constant value;
+	JSONValue value;
 	Nullable!string kind;
 	/*this(Constant value, Nullable!string kind) {
 		this.value = value;

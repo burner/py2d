@@ -4,6 +4,7 @@
 	],
 	"copyright": "Copyright © 2021, Robert Schadek",
 	"dependencies": {
+		"aggregateprinter": "~>2.4.0",
 		"argsd": "~>1.0.0"
 	},
 	"description": "A tool to convert python to dlang",
