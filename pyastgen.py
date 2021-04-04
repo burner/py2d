@@ -10,7 +10,6 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", type=str,
                     help="the file to write the json ast to, stdout by default")
     args = parser.parse_args();
-    print(args);
 
     code = ast2json(ast.parse(open(args.input).read()))
     ast = json.dumps(code, indent=4);
